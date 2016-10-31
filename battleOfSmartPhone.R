@@ -8,6 +8,7 @@ library(gridExtra)
 #library(grid)
 library(leaflet)
 library(viridis)
+library(deldir)
 
 setwd("~/project/kaggle/")
 app_events_df <- read.csv("input/app_events.csv", header = T, stringsAsFactors = F)
@@ -164,4 +165,73 @@ leaflet(data = data2) %>%
     options = layersControlOptions(collapsed = FALSE)
   )
 
+
+
+#######
+# I picked just these brand names
+brand_names <- c('小米', '三星', '华为', '魅族', '酷派', '联想')
+# Constrain the event data by lat/long of China (good enough)
+# and restrict to just the brand names we care about plotting
+sub_events <- raw_all %>%
+  filter(phone_brand %in% brand_names & 
+           longitude <= 134.7739 &
+           longitude >= 73.5577 &
+           latitude  <= 53.56086  &
+           latitude  >= 18.15931)
+
+# Grab a sample of the data
+sample_events <- sub_events[sample(1:nrow(sub_events), 10000,
+                                   replace=FALSE), ]
+
+# Order the levels of the brand factor
+sample_events$phone_brand <- factor(sample_events$phone_brand,
+                                    levels = c('小米', '三星', '华为', '魅族', '酷派', '联想'))
+
+# Renaming using English names - thanks Kevin!
+english_names = c('xiaomi', 'samsung', 'huawei', 'meizu', 'coolpad', 'lenovo')
+
+levels(sample_events$phone_brand) <- english_names
+
+# Set colors & transparency for the maps and for the Voronoi lines
+col_pal <- adjustcolor(viridis(length(brand_names)), alpha.f = 0.15)
+line_col <- adjustcolor('#47494D', alpha.f = 0.7)
+
+# Make space for six phone brands leaving extra room for titles
+par(mfrow=c(2,3), mar=c(0.25,0.25,2,0.25))
+
+
+# Plot
+for(i in 1:length(english_names)){
+  
+  sub_sample_events <- sample_events %>%
+    filter(phone_brand == english_names[i])
+  
+  phone_color <- col_pal[i] # set a different color for each phone map
+  
+  # Start plotting the small multiple maps
+  plot(sub_sample_events$longitude, sub_sample_events$latitude, 
+       asp=1, 
+       type='n', 
+       bty='n', 
+       xlab='', 
+       ylab='', 
+       axes=FALSE)
+  title(main = list(english_names[i], cex = 2))
+  
+  # Plot event points
+  points(sub_sample_events$longitude, sub_sample_events$latitude, 
+         pch=20, 
+         cex=1.5, 
+         col=phone_color)
+  
+  # Add the voronoi plots
+  voronoi_tess <- deldir(sub_sample_events$longitude, sub_sample_events$latitude)
+  plot(voronoi_tess, 
+       wlines='tess', # Tesselated, not triangulated
+       wpoints='none', 
+       number=FALSE, 
+       add=TRUE, 
+       lty=1, 
+       col=line_col)
+}
 
